@@ -1,0 +1,37 @@
+name: Build Android-TV Universal APK (32/64+Leanback+焦点)
+
+on:
+  workflow_dispatch:   # 手动按钮
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1. 装 Flutter
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      # 2. 改 build.gradle：加 32 位 + TV 开关
+      - name: Enable 32-bit & TV flags
+        run: |
+          sed -i "/abiFilters/ s/arm64-v8a/armeabi-v7a','arm64-v8a/" android/app/build.gradle
+
+      # 3. 用提前写好的 TV 专用 Manifest 整体覆盖
+      - name: Use TV-ready AndroidManifest.xml
+        run: |
+          cp android/app/src/main/AndroidManifest_tv.xml android/app/src/main/AndroidManifest.xml
+
+      # 4. 依赖 & 编译
+      - run: flutter pub get
+      - run: flutter build apk --release
+
+      # 5. 上传 APK
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tv-universal-apk
+          path: build/app/outputs/flutter-apk/*.apk
